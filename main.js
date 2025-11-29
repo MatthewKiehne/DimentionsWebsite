@@ -1,6 +1,8 @@
-// Fake data - named entities with relationships
-// In the future, this will be replaced with data from Azure Function endpoint
-const graphData = {
+// Azure Function endpoint configuration
+const AZURE_FUNCTION_ENDPOINT = 'http://localhost:7221/api/GetDimensionsGraph';
+
+// Fake data - fallback for testing
+const fallbackGraphData = {
     nodes: [
         // People
         { id: 'alice', name: 'Alice Johnson', type: 'person', description: 'Software Engineer specializing in web development' },
@@ -54,202 +56,254 @@ const graphData = {
     ]
 };
 
-// Graph dimensions
-const container = document.getElementById('graph-container');
-const width = window.innerWidth;
-const height = window.innerHeight;
+// Global variable to hold graph data
+let graphData = null;
 
-// Create SVG element
-const svg = d3.select('#graph-container')
-    .append('svg')
-    .attr('width', width)
-    .attr('height', height);
+// Fetch data from Azure Function endpoint
+async function fetchGraphData() {
+    try {
+        console.log('Fetching dimension data from Azure Function...');
+        const response = await fetch(AZURE_FUNCTION_ENDPOINT);
 
-// Create a group for zoom/pan
-const g = svg.append('g');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-// Define zoom behavior
-const zoom = d3.zoom()
-    .scaleExtent([0.1, 4])
-    .on('zoom', (event) => {
-        g.attr('transform', event.transform);
+        const data = await response.json();
+        console.log('Successfully fetched dimension data:', data);
+
+        // Normalize property names (handle both PascalCase and camelCase)
+        // const normalizedData = {
+        //     nodes: data.nodes || data.Nodes || [],
+        //     links: data.links || data.Links || []
+        // };
+
+        console.log('Normalized data:', data);
+        return data;
+    } catch (error) {
+        console.error('Error fetching dimension data:', error);
+        console.log('Using fallback data instead');
+        return fallbackGraphData;
+    }
+}
+
+// Initialize the graph visualization
+function initializeGraph(data) {
+    graphData = data;
+
+    // Graph dimensions
+    const container = document.getElementById('graph-container');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Create SVG element
+    const svg = d3.select('#graph-container')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+    // Create a group for zoom/pan
+    const g = svg.append('g');
+
+    // Define zoom behavior
+    const zoom = d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        });
+
+    svg.call(zoom);
+
+    console.log('links:', graphData.links);
+    console.log('nodes:', graphData.nodes);
+
+    // Create force simulation
+    const simulation = d3.forceSimulation(graphData.nodes)
+        .force('link', d3.forceLink(graphData.links)
+            .id(d => d.id)
+            .distance(100))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(30));
+
+    // Create links
+    const link = g.append('g')
+        .selectAll('line')
+        .data(graphData.links)
+        .enter()
+        .append('line')
+        .attr('class', 'link');
+
+    // Create nodes
+    const node = g.append('g')
+        .selectAll('g')
+        .data(graphData.nodes)
+        .enter()
+        .append('g')
+        .attr('class', d => `node ${d.type}`)
+        .call(drag(simulation));
+
+    // Add circles to nodes
+    node.append('circle')
+        .attr('r', 20);
+
+    // Add labels to nodes
+    node.append('text')
+        .attr('dy', 35)
+        .text(d => d.name);
+
+    // Tooltip element
+    const tooltip = d3.select('#tooltip');
+
+    // Hover interactions for tooltip
+    node.on('mouseenter', function(event, d) {
+        tooltip
+            .html(`<strong>${d.name}</strong><br>${d.type}<br>${d.description}`)
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY + 10) + 'px')
+            .classed('hidden', false);
+    })
+    .on('mousemove', function(event) {
+        tooltip
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY + 10) + 'px');
+    })
+    .on('mouseleave', function() {
+        tooltip.classed('hidden', true);
     });
 
-svg.call(zoom);
+    // Click interactions for details panel
+    const detailsPanel = document.getElementById('details-panel');
+    const detailName = document.getElementById('detail-name');
+    const detailType = document.getElementById('detail-type');
+    const detailDescription = document.getElementById('detail-description');
+    const detailConnections = document.getElementById('detail-connections');
+    const closeBtn = document.getElementById('close-details');
 
-// Create force simulation
-const simulation = d3.forceSimulation(graphData.nodes)
-    .force('link', d3.forceLink(graphData.links)
-        .id(d => d.id)
-        .distance(100))
-    .force('charge', d3.forceManyBody().strength(-300))
-    .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(30));
+    node.on('click', function(event, d) {
+        event.stopPropagation();
+        showDetails(d);
+    });
 
-// Create links
-const link = g.append('g')
-    .selectAll('line')
-    .data(graphData.links)
-    .enter()
-    .append('line')
-    .attr('class', 'link');
+    closeBtn.addEventListener('click', () => {
+        detailsPanel.classList.add('hidden');
+    });
 
-// Create nodes
-const node = g.append('g')
-    .selectAll('g')
-    .data(graphData.nodes)
-    .enter()
-    .append('g')
-    .attr('class', d => `node ${d.type}`)
-    .call(drag(simulation));
+    // Close details panel when clicking outside
+    svg.on('click', () => {
+        detailsPanel.classList.add('hidden');
+    });
 
-// Add circles to nodes
-node.append('circle')
-    .attr('r', 20);
+    // Header panel toggle functionality
+    const headerPanel = document.getElementById('header-panel');
+    const toggleHeaderBtn = document.getElementById('toggle-header');
 
-// Add labels to nodes
-node.append('text')
-    .attr('dy', 35)
-    .text(d => d.name);
-
-// Tooltip element
-const tooltip = d3.select('#tooltip');
-
-// Hover interactions for tooltip
-node.on('mouseenter', function(event, d) {
-    tooltip
-        .html(`<strong>${d.name}</strong><br>${d.type}<br>${d.description}`)
-        .style('left', (event.pageX + 10) + 'px')
-        .style('top', (event.pageY + 10) + 'px')
-        .classed('hidden', false);
-})
-.on('mousemove', function(event) {
-    tooltip
-        .style('left', (event.pageX + 10) + 'px')
-        .style('top', (event.pageY + 10) + 'px');
-})
-.on('mouseleave', function() {
-    tooltip.classed('hidden', true);
-});
-
-// Click interactions for details panel
-const detailsPanel = document.getElementById('details-panel');
-const detailName = document.getElementById('detail-name');
-const detailType = document.getElementById('detail-type');
-const detailDescription = document.getElementById('detail-description');
-const detailConnections = document.getElementById('detail-connections');
-const closeBtn = document.getElementById('close-details');
-
-node.on('click', function(event, d) {
-    event.stopPropagation();
-    showDetails(d);
-});
-
-closeBtn.addEventListener('click', () => {
-    detailsPanel.classList.add('hidden');
-});
-
-// Close details panel when clicking outside
-svg.on('click', () => {
-    detailsPanel.classList.add('hidden');
-});
-
-// Header panel toggle functionality
-const headerPanel = document.getElementById('header-panel');
-const toggleHeaderBtn = document.getElementById('toggle-header');
-
-toggleHeaderBtn.addEventListener('click', () => {
-    headerPanel.classList.toggle('minimized');
-    if (headerPanel.classList.contains('minimized')) {
-        toggleHeaderBtn.textContent = '+';
-        toggleHeaderBtn.title = 'Expand header';
-    } else {
-        toggleHeaderBtn.textContent = '−';
-        toggleHeaderBtn.title = 'Minimize header';
-    }
-});
-
-function showDetails(node) {
-    detailName.textContent = node.name;
-    detailType.textContent = node.type.charAt(0).toUpperCase() + node.type.slice(1);
-    detailDescription.textContent = node.description;
-
-    // Find all connections
-    const connections = [];
-    graphData.links.forEach(link => {
-        if (link.source.id === node.id) {
-            connections.push({
-                name: link.target.name,
-                relationship: link.relationship,
-                direction: 'to'
-            });
-        } else if (link.target.id === node.id) {
-            connections.push({
-                name: link.source.name,
-                relationship: link.relationship,
-                direction: 'from'
-            });
+    toggleHeaderBtn.addEventListener('click', () => {
+        headerPanel.classList.toggle('minimized');
+        if (headerPanel.classList.contains('minimized')) {
+            toggleHeaderBtn.textContent = '+';
+            toggleHeaderBtn.title = 'Expand header';
+        } else {
+            toggleHeaderBtn.textContent = '−';
+            toggleHeaderBtn.title = 'Minimize header';
         }
     });
 
-    // Display connections
-    if (connections.length > 0) {
-        detailConnections.innerHTML = '<h4>Connections</h4><ul>' +
-            connections.map(conn => {
-                const arrow = conn.direction === 'to' ? '→' : '←';
-                return `<li>${arrow} ${conn.relationship} ${conn.name}</li>`;
-            }).join('') +
-            '</ul>';
-    } else {
-        detailConnections.innerHTML = '<p>No connections</p>';
+    function showDetails(node) {
+        detailName.textContent = node.name;
+        detailType.textContent = node.type.charAt(0).toUpperCase() + node.type.slice(1);
+        detailDescription.textContent = node.description;
+
+        // Find all connections
+        const connections = [];
+        graphData.links.forEach(link => {
+            if (link.source.id === node.id) {
+                connections.push({
+                    name: link.target.name,
+                    relationship: link.relationship,
+                    direction: 'to'
+                });
+            } else if (link.target.id === node.id) {
+                connections.push({
+                    name: link.source.name,
+                    relationship: link.relationship,
+                    direction: 'from'
+                });
+            }
+        });
+
+        // Display connections
+        if (connections.length > 0) {
+            detailConnections.innerHTML = '<h4>Connections</h4><ul>' +
+                connections.map(conn => {
+                    const arrow = conn.direction === 'to' ? '→' : '←';
+                    return `<li>${arrow} ${conn.relationship} ${conn.name}</li>`;
+                }).join('') +
+                '</ul>';
+        } else {
+            detailConnections.innerHTML = '<p>No connections</p>';
+        }
+
+        detailsPanel.classList.remove('hidden');
     }
 
-    detailsPanel.classList.remove('hidden');
+    // Drag functionality
+    function drag(simulation) {
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+
+        return d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended);
+    }
+
+    // Update positions on each tick
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+
+        node
+            .attr('transform', d => `translate(${d.x},${d.y})`);
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight;
+
+        svg.attr('width', newWidth).attr('height', newHeight);
+        simulation.force('center', d3.forceCenter(newWidth / 2, newHeight / 2));
+        simulation.alpha(0.3).restart();
+    });
 }
 
-// Drag functionality
-function drag(simulation) {
-    function dragstarted(event) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-    }
-
-    function dragged(event) {
-        event.subject.fx = event.x;
-        event.subject.fy = event.y;
-    }
-
-    function dragended(event) {
-        if (!event.active) simulation.alphaTarget(0);
-        event.subject.fx = null;
-        event.subject.fy = null;
-    }
-
-    return d3.drag()
-        .on('start', dragstarted)
-        .on('drag', dragged)
-        .on('end', dragended);
+// Initialize the application
+async function init() {
+    const data = await fetchGraphData();
+    initializeGraph(data);
 }
 
-// Update positions on each tick
-simulation.on('tick', () => {
-    link
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y);
-
-    node
-        .attr('transform', d => `translate(${d.x},${d.y})`);
-});
-
-// Handle window resize
-window.addEventListener('resize', () => {
-    const newWidth = window.innerWidth;
-    const newHeight = window.innerHeight;
-
-    svg.attr('width', newWidth).attr('height', newHeight);
-    simulation.force('center', d3.forceCenter(newWidth / 2, newHeight / 2));
-    simulation.alpha(0.3).restart();
-});
+// Start the application when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}

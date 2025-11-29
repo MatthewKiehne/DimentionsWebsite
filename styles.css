@@ -125,21 +125,21 @@ body {
     fill: #333;
 }
 
-/* Node type colors */
-.node.person circle {
-    fill: #4299e1;
+/* Node type colors - based on dimension size */
+.node.Small circle {
+    fill: #48d1cc; /* Turquoise */
 }
 
-.node.organization circle {
-    fill: #48bb78;
+.node.Medium circle {
+    fill: #48bb78; /* Green */
 }
 
-.node.project circle {
-    fill: #ed8936;
+.node.Large circle {
+    fill: #ed8936; /* Orange */
 }
 
-.node.technology circle {
-    fill: #9f7aea;
+.node.Huge circle {
+    fill: #e53e3e; /* Red */
 }
 
 /* Tooltip */
