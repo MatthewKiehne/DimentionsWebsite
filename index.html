@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force-Directed Graph Visualization</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="graph-container"></div>
+
+    <div id="header-panel" class="header-panel">
+        <div class="header-content">
+            <h1>Network Visualization</h1>
+            <p>Interact with the graph: drag nodes, zoom/pan, hover for tooltips, click for details</p>
+        </div>
+        <button id="toggle-header" class="toggle-btn" title="Minimize header">−</button>
+    </div>
+
+    <div id="details-panel" class="details-panel hidden">
+        <div class="details-header">
+            <h2>Node Details</h2>
+            <button id="close-details" class="close-btn">&times;</button>
+        </div>
+        <div class="details-content">
+            <h3 id="detail-name"></h3>
+            <p id="detail-type"></p>
+            <div id="detail-description"></div>
+            <div id="detail-connections"></div>
+        </div>
+    </div>
+
+    <div id="tooltip" class="tooltip hidden"></div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
