@@ -1,5 +1,5 @@
 // Azure Function endpoint configuration
-const AZURE_FUNCTION_ENDPOINT = 'http://localhost:7221/api/GetDimensionsGraph';
+const AZURE_FUNCTION_ENDPOINT = 'https://qtyh-ctfndserc5ctbha5.centralus-01.azurewebsites.net/api/GetDimensionsGraph';
 
 // Fake data - fallback for testing
 const fallbackGraphData = {
@@ -72,12 +72,6 @@ async function fetchGraphData() {
         const data = await response.json();
         console.log('Successfully fetched dimension data:', data);
 
-        // Normalize property names (handle both PascalCase and camelCase)
-        // const normalizedData = {
-        //     nodes: data.nodes || data.Nodes || [],
-        //     links: data.links || data.Links || []
-        // };
-
         console.log('Normalized data:', data);
         return data;
     } catch (error) {
@@ -117,14 +111,28 @@ function initializeGraph(data) {
     console.log('links:', graphData.links);
     console.log('nodes:', graphData.nodes);
 
-    // Create force simulation
+    // Create force simulation with size-based charge force
     const simulation = d3.forceSimulation(graphData.nodes)
         .force('link', d3.forceLink(graphData.links)
             .id(d => d.id)
             .distance(100))
-        .force('charge', d3.forceManyBody().strength(-300))
+        .force('charge', d3.forceManyBody().strength(d => {
+            if (d.type === 'portal') return -50;  // Very weak force
+            if (d.type === 'Huge') return -600;   // Strongest force
+            if (d.type === 'Large') return -450;
+            if (d.type === 'Medium') return -300;
+            if (d.type === 'Small') return -150;  // Weakest dimension force
+            return -300; // default
+        }))
         .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(30));
+        .force('collision', d3.forceCollide().radius(d => {
+            if (d.type === 'portal') return 12;
+            if (d.type === 'Huge') return 35;
+            if (d.type === 'Large') return 30;
+            if (d.type === 'Medium') return 25;
+            if (d.type === 'Small') return 20;
+            return 25; // default
+        }));
 
     // Create links
     const link = g.append('g')
@@ -143,13 +151,27 @@ function initializeGraph(data) {
         .attr('class', d => `node ${d.type}`)
         .call(drag(simulation));
 
-    // Add circles to nodes
+    // Add circles to nodes with size based on dimension size
     node.append('circle')
-        .attr('r', 20);
+        .attr('r', d => {
+            if (d.type === 'portal') return 8;
+            if (d.type === 'Huge') return 30;
+            if (d.type === 'Large') return 25;
+            if (d.type === 'Medium') return 20;
+            if (d.type === 'Small') return 15;
+            return 20; // default
+        });
 
-    // Add labels to nodes
+    // Add labels to nodes (position based on node size)
     node.append('text')
-        .attr('dy', 35)
+        .attr('dy', d => {
+            if (d.type === 'portal') return 20;
+            if (d.type === 'Huge') return 42;
+            if (d.type === 'Large') return 37;
+            if (d.type === 'Medium') return 32;
+            if (d.type === 'Small') return 27;
+            return 32; // default
+        })
         .text(d => d.name);
 
     // Tooltip element

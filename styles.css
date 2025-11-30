@@ -6,7 +6,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #000000;
     height: 100vh;
     width: 100vw;
     overflow: hidden;
@@ -21,7 +21,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #000000;
 }
 
 #graph-container svg {
@@ -100,8 +100,8 @@ body {
 
 /* Node and Link Styles */
 .link {
-    stroke: #999;
-    stroke-opacity: 0.6;
+    stroke: #666;
+    stroke-opacity: 0.8;
     stroke-width: 2px;
 }
 
@@ -122,7 +122,7 @@ body {
     font-weight: 500;
     pointer-events: none;
     text-anchor: middle;
-    fill: #333;
+    fill: #ffffff;
 }
 
 /* Node type colors - based on dimension size */
@@ -140,6 +140,11 @@ body {
 
 .node.Huge circle {
     fill: #e53e3e; /* Red */
+}
+
+/* Portal nodes - unlinked portals */
+.node.portal circle {
+    fill: #404040; /* Dark Gray */
 }
 
 /* Tooltip */
